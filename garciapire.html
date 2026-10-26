@@ -261,12 +261,28 @@ button,input,textarea{font:inherit;color:inherit}
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
       chunks=[]; rec=new MediaRecorder(stream);
       rec.ondataavailable=function(e){ if(e.data.size) chunks.push(e.data); };
+      var SR=window.SpeechRecognition||window.webkitSpeechRecognition, recog=null, finales=[], parcial='', grabando=true;
+      if(SR){
+        try{
+          recog=new SR(); recog.lang='es-ES'; recog.continuous=true; recog.interimResults=true;
+          recog.onresult=function(ev){ parcial=''; for(var k=ev.resultIndex;k<ev.results.length;k++){ var r=ev.results[k]; if(r.isFinal) finales.push(r[0].transcript.trim()); else parcial+=r[0].transcript; } };
+          recog.onerror=function(){};
+          recog.onend=function(){ if(grabando){ try{ recog.start(); }catch(x){} } };
+        }catch(x){ recog=null; }
+      }
       rec.onstop=function(){
+        grabando=false;
         stream.getTracks().forEach(function(t){t.stop()}); stopUI();
         var type=rec.mimeType||'audio/webm', b=new Blob(chunks,{type:type});
-        try{ addFile(new File([b],'audio-averia.'+(type.indexOf('mp4')>-1?'m4a':'webm'),{type:type})); }catch(e){ addFile(b); }
+        var terminar=function(){
+          var txt=finales.concat(parcial?[parcial.trim()]:[]).join(' ').replace(/\s+/g,' ').trim();
+          var f; try{ f=new File([b],'audio-averia.'+(type.indexOf('mp4')>-1?'m4a':'webm'),{type:type}); }catch(e){ f=b; }
+          addFile(f); if(st.files.length) st.files[st.files.length-1].transcripcion=txt;
+        };
+        if(recog){ try{ recog.stop(); }catch(x){} setTimeout(terminar,900); } else terminar();
       };
-      rec.start(); t0=Date.now(); $('recbar').hidden=false; $('mic').disabled=true;
+      rec.start(); if(recog){ try{ recog.start(); }catch(x){} }
+      t0=Date.now(); $('recbar').hidden=false; $('mic').disabled=true;
       var upd=function(){ var s=Math.floor((Date.now()-t0)/1000); $('recTime').textContent='Grabando '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); if(s>=180) rec.stop(); };
       upd(); tick=setInterval(upd,500);
     }).catch(function(){ noMic(); });
@@ -358,7 +374,7 @@ button,input,textarea{font:inherit;color:inherit}
         var ext=(blob.type.split('/')[1]||'bin').split(';')[0].replace('quicktime','mov').replace('jpeg','jpg');
         files.push({tipo:it.kind, type:blob.type||'application/octet-stream', name:it.kind.toLowerCase().replace('í','i')+(i+1)+'.'+ext, data:await b64(blob)});
       }
-      var payload=JSON.stringify({codigo:code, cliente:cli.nombre, local:st.local, clienteBC:locInfo(st.local).bc||'', envioBC:locInfo(st.local).envio||'', texto:st.texto.trim(), files:files});
+      var payload=JSON.stringify({codigo:code, cliente:cli.nombre, local:st.local, clienteBC:locInfo(st.local).bc||'', envioBC:locInfo(st.local).envio||'', texto:st.texto.trim(), transcripcion:st.files.filter(function(f){return f.kind==='Audio'&&f.transcripcion}).map(function(f){return f.transcripcion}).join(' | '), files:files});
       var res=null, last=null;
       for(var t=0;t<3 && !res;t++){
         b.textContent = t ? 'Reintentando…' : (files.length?'Enviando aviso y adjuntos…':'Enviando aviso…');
