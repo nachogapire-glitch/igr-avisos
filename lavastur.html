@@ -468,7 +468,8 @@ button,input,textarea{font:inherit;color:inherit}
         var ext=(blob.type ? (blob.type.split('/')[1]||'bin') : (((it.blob.name||'').match(/\.([a-z0-9]+)$/i)||[])[1]||'bin')).split(';')[0].replace('quicktime','mov').replace('jpeg','jpg');
         files.push({tipo:it.kind, type:blob.type||'application/octet-stream', name:it.kind.toLowerCase().replace('í','i')+(i+1)+'.'+ext, data:await b64(blob)});
       }
-      var payload=JSON.stringify({codigo:code, cliente:cli.nombre, local:st.local, clienteBC:locInfo(st.local).bc||'', envioBC:locInfo(st.local).envio||'', texto:st.texto.trim(), transcripcion:st.files.filter(function(f){return f.kind==='Audio'&&f.transcripcion}).map(function(f){return f.transcripcion}).join(' | '), files:files});
+      if(!st.uid) st.uid=code+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+      var payload=JSON.stringify({uid:st.uid, codigo:code, cliente:cli.nombre, local:st.local, clienteBC:locInfo(st.local).bc||'', envioBC:locInfo(st.local).envio||'', texto:st.texto.trim(), transcripcion:st.files.filter(function(f){return f.kind==='Audio'&&f.transcripcion}).map(function(f){return f.transcripcion}).join(' | '), files:files});
       var res=null, last=null;
       for(var t=0;t<3 && !res;t++){
         b.textContent = t ? 'Reintentando…' : (files.length?'Enviando aviso y adjuntos…':'Enviando aviso…');
@@ -488,7 +489,7 @@ button,input,textarea{font:inherit;color:inherit}
     finally{ b.disabled=false; b.textContent='Enviar aviso'; }
   }
   $('again').addEventListener('click',function(){
-    st.texto=''; st.files=[]; $('texto').value=''; renderAtt();
+    st.texto=''; st.files=[]; st.uid=''; $('texto').value=''; renderAtt();
     if(cli.locales.length>1) st.local='';
     document.querySelectorAll('[aria-pressed]').forEach(function(x){ x.setAttribute('aria-pressed','false'); });
     whoLine(); cur=0; $('foot').hidden=false; $('bar').style.visibility='visible'; show();
